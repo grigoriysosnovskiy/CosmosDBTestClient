@@ -11,25 +11,34 @@ namespace CosmosDBTestClient.App
         #region RenderMenuItems
         private static string RenderMenuItems()
         {
-            List<string> menuItems = new List<string>()
+            try
             {
-                "Exit program",
-                "Create folder(s)",
-                "Create asset(s)",
-                "Show asset",
-                "Show assets in folder",
-                "Copy folder with replace",
-                "Copy folder with merge",
-                "Copy folder with skip",
-                "Delete database"
-            };
+                List<string> menuItems = new List<string>()
+                {
+                    "Exit program",
+                    "Create folder(s)",
+                    "Create asset(s)",
+                    "Show asset",
+                    "Show assets in folder",
+                    "Copy folder with replace",
+                    "Copy folder with merge",
+                    "Copy folder with skip",
+                    "Delete database"
+                };
 
-            for (int i = 0; i < menuItems.Count; i++)
-            {
-                menuItems[i] = menuItems[i].Trim().Insert(0, $"{i}. ");
+                for (int i = 0; i < menuItems.Count; i++)
+                {
+                    menuItems[i] = menuItems[i].Trim().Insert(0, $"{i}. ");
+                }
+
+                return string.Join("\n", menuItems.ToArray());
             }
-
-            return string.Join("\n", menuItems.ToArray()); 
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+                throw;
+            }
         }
         #endregion
 
@@ -43,8 +52,6 @@ namespace CosmosDBTestClient.App
             string number = "-1";
             do
             {
-                Console.Clear();
-
                 // TO DO
 
                 // CopyFolder
@@ -53,6 +60,7 @@ namespace CosmosDBTestClient.App
                 // MoveFolder
                 // merge/replace/skip. merge content with existing folder or replace existing folder (optional).
 
+                Console.Clear();
                 Console.WriteLine(RenderMenuItems());
                 Console.Write(">> ");
                 number = Console.ReadLine();
@@ -79,7 +87,7 @@ namespace CosmosDBTestClient.App
                         break;
                     case "4": // Show assets in folder
                         Console.Clear();
-                        //DatabaseHandler.ShowAsset(client);
+                        DatabaseHandler.ShowAssets(client);
                         break;
                     case "5": // Copy folder with replace
                         Console.Clear();

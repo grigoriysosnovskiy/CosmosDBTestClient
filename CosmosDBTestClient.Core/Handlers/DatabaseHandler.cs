@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
-using CosmosDBTestClient.Core.Utils;
 using CosmosDBTestClient.Core.Models;
-using System.Linq;
+using CosmosDBTestClient.Core.Utils;
 
 namespace CosmosDBTestClient.Core.Handlers
 {
@@ -14,31 +14,48 @@ namespace CosmosDBTestClient.Core.Handlers
         #region CreateDatabaseItemsIfNotExists
         public static async Task CreateDatabaseItemsIfNotExists(DocumentClient client)
         {
-            // Create folders DB and info collection if not exists
-            await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseSettings.foldersDB });
-            await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseSettings.foldersDB), new DocumentCollection { Id = DatabaseSettings.foldersCollection });
+            try
+            {
+                // Create folders DB and info collection if not exists
+                await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseSettings.foldersDB });
+                await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseSettings.foldersDB), new DocumentCollection { Id = DatabaseSettings.foldersCollection });
 
-            // Create assets DB and info collection if not exists
-            await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseSettings.assetsDB });
-            await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseSettings.assetsDB), new DocumentCollection { Id = DatabaseSettings.assetsCollection });
+                // Create assets DB and info collection if not exists
+                await client.CreateDatabaseIfNotExistsAsync(new Database { Id = DatabaseSettings.assetsDB });
+                await client.CreateDocumentCollectionIfNotExistsAsync(UriFactory.CreateDatabaseUri(DatabaseSettings.assetsDB), new DocumentCollection { Id = DatabaseSettings.assetsCollection });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+            }
         }
         #endregion
 
         #region CreateFolder
         private static dynamic CreateFolder()
         {
-            object folder = null;
-
-            Console.Write("Enter name -> ");
-            string name = Console.ReadLine();
-
-            folder = new FolderModel
+            try
             {
-                Name = name,
-                Path = DatabaseSettings.folderPath
-            };
+                object folder = null;
 
-            return folder;
+                Console.Write("Enter name -> ");
+                string name = Console.ReadLine();
+
+                folder = new FolderModel
+                {
+                    Name = name,
+                    Path = DatabaseSettings.folderPath
+                };
+
+                return folder;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+                throw;
+            }
         }
         #endregion
 
@@ -47,114 +64,122 @@ namespace CosmosDBTestClient.Core.Handlers
         {
             while (true)
             {
-                Console.Write("Create new folder, y/n -> ");
-                var key = Console.ReadKey().Key;
-                Console.WriteLine();
-                if (key == ConsoleKey.Y)
+                try
                 {
-                    await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.foldersDB, DatabaseSettings.foldersCollection), CreateFolder());
+                    Console.Write("Create new folder, y/n -> ");
+                    var key = Console.ReadKey().Key;
+                    Console.WriteLine();
+                    if (key == ConsoleKey.Y)
+                    {
+                        await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.foldersDB, DatabaseSettings.foldersCollection), CreateFolder());
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    break;
+                    Console.WriteLine(ex.Message);
+                    System.Threading.Thread.Sleep(500);
                 }
             }
         }
         #endregion
-        
-        #region RenderCreateModelMenu
-        private static string RenderCreateModelMenu()
+
+        #region GetFolderIdByName
+        private static Document GetFolderIdByName(DocumentClient client)
         {
-            List<string> menuItems = new List<string>()
-            {
-                "Create volcano"
-            };
+            Console.Write("Enter folder name -> ");
+            string folderName = Console.ReadLine();
+            string query = $"SELECT * FROM c WHERE c.Name = \"{folderName}\"";
 
-            for (int i = 0; i < menuItems.Count; i++)
+            return client.CreateDocumentQuery(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.foldersDB, DatabaseSettings.foldersCollection), query).AsEnumerable().FirstOrDefault();
+        }
+        #endregion
+
+        #region RenderModelMenu
+        private static string RenderModelMenu()
+        {
+            try
             {
-                menuItems[i] = menuItems[i].Trim().Insert(0, $"{i + 1}. ");
+                List<string> menuItems = new List<string>()
+                {
+                    "Volcano"
+                };
+
+                for (int i = 0; i < menuItems.Count; i++)
+                {
+                    menuItems[i] = menuItems[i].Trim().Insert(0, $"{i + 1}. ");
+                }
+
+                return string.Join("\n", menuItems.ToArray());
             }
-
-            return string.Join("\n", menuItems.ToArray());
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+                throw;
+            }
         }
         #endregion
 
         #region CreateModel
         private static dynamic CreateModel(DocumentClient client)
         {
-            object model = null;
-
-            Console.WriteLine(RenderCreateModelMenu());
-            Console.Write(">> ");
-            string number = Console.ReadLine();
-            switch (number)
+            try
             {
-                case "1": // Create volcano
-                    Console.Clear();
+                object model = null;
 
-                    Console.Write("Enter folder name to place asset there -> ");
-                    string folderName = Console.ReadLine();
-                    string query = $"SELECT * FROM c WHERE c.Name = \"{folderName}\"";
-                    Document folder = client.CreateDocumentQuery(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.foldersDB, DatabaseSettings.foldersCollection), query).AsEnumerable().FirstOrDefault();
+                Console.WriteLine("Create:");
+                Console.WriteLine(RenderModelMenu());
+                Console.Write(">> ");
+                string number = Console.ReadLine();
+                switch (number)
+                {
+                    case "1": // Create volcano
+                        Console.Clear();
+                        model = new VolcanoModel(GetFolderIdByName(client).Id);
+                        break;
+                    default:
+                        break;
+                }
 
-                    Console.WriteLine("Randomize coordinates... ");
-                    double[] coordinates = new double[3] { Math.Round(new Random().NextDouble() * (180 - 1) + 1, 2), Math.Round(new Random().NextDouble() * (180 - 1) + 1, 2), Math.Round(new Random().NextDouble() * (180 - 1) + 1, 2) };
-                    System.Threading.Thread.Sleep(500);
-
-                    Console.Write("Enter name -> ");
-                    string name = Console.ReadLine();
-
-                    Console.Write("Enter country -> ");
-                    string country = Console.ReadLine();
-
-                    Console.Write("Enter region -> ");
-                    string region = Console.ReadLine();
-
-                    Console.Write("Enter elevation -> ");
-                    double elevation = Convert.ToDouble(Console.ReadLine());
-
-                    Console.Write("Enter status -> ");
-                    string status = Console.ReadLine();
-
-                    Console.Write("Enter last eruption -> ");
-                    short lastEruption = Convert.ToInt16(Console.ReadLine());
-
-                    model = new VolcanoModel
-                    {
-                        FolderId = folder.Id,
-                        Coordinates = coordinates,
-                        Name = name,
-                        Country = country,
-                        Region = region,
-                        Elevation = Math.Round(elevation, 2),
-                        Status = status,
-                        LastEruption = lastEruption
-                    };
-                    break;
-                default:
-                    break;
+                return model;
             }
-
-            return model;
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+                throw;
+            }
         }
         #endregion
-        
+
         #region CreateAssetAsync
         public static async Task CreateAssetAsync(DocumentClient client)
         {
-            while (true)
+            try
             {
-                Console.Write("Create new asset, y/n -> ");
-                var key = Console.ReadKey().Key;
-                Console.WriteLine();
-                if (key == ConsoleKey.Y)
+                while (true)
                 {
-                    await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.assetsDB, DatabaseSettings.assetsCollection), CreateModel(client));
+                    Console.Write("Create new asset, y/n -> ");
+                    var key = Console.ReadKey().Key;
+                    Console.WriteLine();
+                    if (key == ConsoleKey.Y)
+                    {
+                        await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.assetsDB, DatabaseSettings.assetsCollection), CreateModel(client));
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
-                else
-                {
-                    break;
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
             }
         }
         #endregion
@@ -162,21 +187,71 @@ namespace CosmosDBTestClient.Core.Handlers
         #region ShowAsset
         public static void ShowAsset(DocumentClient client)
         {
-            while (true)
+            try
             {
-                Console.Clear();
-
-                Console.Write("Enter volcano name, y/n -> ");
-                //var volcano = client.CreateDocumentQuery<VolcanoModel>(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.dbName, DatabaseSettings.collectionName)).Where(v => v.Name == Console.ReadLine()).AsEnumerable().FirstOrDefault();
-                //Console.WriteLine(volcano.ToString());
-
-                Console.Write("Show another volcano, y/n -> ");
-                var key = Console.ReadKey().Key;
-                Console.WriteLine();
-                if (key != ConsoleKey.Y)
+                while (true)
                 {
-                    break;
+                    Console.Clear();
+                    Console.WriteLine("Show:");
+                    Console.WriteLine(RenderModelMenu());
+                    Console.Write(">> ");
+                    string number = Console.ReadLine();
+                    switch (number)
+                    {
+                        case "1": // Show volcano
+                            Console.Clear();
+                            Console.Write("Enter volcano name, y/n -> ");
+                            var volcano = client.CreateDocumentQuery<VolcanoModel>(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.assetsDB, DatabaseSettings.assetsCollection)).Where(v => v.Name == Console.ReadLine()).AsEnumerable().FirstOrDefault();
+                            Console.WriteLine(volcano.ToString());
+                            break;
+                        default:
+                            break;
+                    }
+
+                    Console.Write("Show another asset, y/n -> ");
+                    var key = Console.ReadKey().Key;
+                    Console.WriteLine();
+                    if (key != ConsoleKey.Y)
+                    {
+                        break;
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
+            }
+        }
+        #endregion
+
+        #region ShowAssets
+        public static void ShowAssets(DocumentClient client)
+        {
+            try
+            {
+                while (true)
+                {
+                    Console.Clear();
+                    var assets = client.CreateDocumentQuery<VolcanoModel>(UriFactory.CreateDocumentCollectionUri(DatabaseSettings.assetsDB, DatabaseSettings.assetsCollection)).Where(v => v.FolderId == GetFolderIdByName(client).Id).ToList();
+                    foreach (var asset in assets)
+                    {
+                        Console.WriteLine(asset.ToString());
+                    }
+
+                    Console.Write("Show another assets, y/n -> ");
+                    var key = Console.ReadKey().Key;
+                    Console.WriteLine();
+                    if (key != ConsoleKey.Y)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(3500);
             }
         }
         #endregion
@@ -184,16 +259,24 @@ namespace CosmosDBTestClient.Core.Handlers
         #region DeleteDatabaseAsync
         public static async Task DeleteDatabaseAsync(DocumentClient client)
         {
-            Console.Write("Enter database name -> ");
-            string nameDB = Console.ReadLine();
-            Console.Write("Delete database, y/n -> ");
-            if (Console.ReadKey().Key == ConsoleKey.Y)
+            try
             {
-                await client.DeleteDatabaseAsync(UriFactory.CreateDatabaseUri(nameDB));
+                Console.Write("Enter database name -> ");
+                string nameDB = Console.ReadLine();
+                Console.Write("Delete database, y/n -> ");
+                if (Console.ReadKey().Key == ConsoleKey.Y)
+                {
+                    await client.DeleteDatabaseAsync(UriFactory.CreateDatabaseUri(nameDB));
+                }
+                else
+                {
+                    return;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return;
+                Console.WriteLine(ex.Message);
+                System.Threading.Thread.Sleep(500);
             }
         }
         #endregion
